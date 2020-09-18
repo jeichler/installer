@@ -1,0 +1,19 @@
+# example execution:
+# ansible-playbook -i example-inventory example-playbook.yaml
+# run the role tasks on the
+- name: Shift on Stack UPI example playbook
+  hosts: bastion
+  gather_facts: true
+  tasks:
+
+    # add what you need
+
+    - import_role:
+        name: openshift-upi
+        tasks_from: security-groups
+
+    - import_role:
+        name: openshift-upi
+        tasks_from: network
+    
+    # add what you need

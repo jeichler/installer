@@ -1,0 +1,6 @@
+# example inventory only for example-playbook
+# most likely your group may not be bastion, or you don't use groups at all
+# most likely it's not localhost / the ansible controller either.
+# Adjust your inventory appropriately to your needs.
+[bastion]
+localhost ansible_connection=local
