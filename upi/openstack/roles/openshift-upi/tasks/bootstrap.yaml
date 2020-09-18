@@ -5,39 +5,43 @@
 # openstacksdk
 # netaddr
 
-- import_playbook: common.yaml
+- import_tasks: common.yaml
 
-- hosts: all
-  gather_facts: no
+- name: 'Create the bootstrap server port'
+  os_port:
+    name: "{{ os_port_bootstrap }}"
+    network: "{{ os_network }}"
+    security_groups:
+    - "{{ os_sg_master }}"
+    allowed_address_pairs:
+    - ip_address: "{{ os_subnet_range | next_nth_usable(5) }}"
+    - ip_address: "{{ os_subnet_range | next_nth_usable(6) }}"
 
-  tasks:
-  - name: 'Create the bootstrap server port'
-    os_port:
-      name: "{{ os_port_bootstrap }}"
-      network: "{{ os_network }}"
-      security_groups:
-      - "{{ os_sg_master }}"
-      allowed_address_pairs:
-      - ip_address: "{{ os_subnet_range | next_nth_usable(5) }}"
-      - ip_address: "{{ os_subnet_range | next_nth_usable(6) }}"
+- name: 'Set bootstrap port tag'
+  command:
+    cmd: "openstack port set --tag {{ cluster_id_tag }} {{ os_port_bootstrap }}"
 
-  - name: 'Set bootstrap port tag'
-    command:
-      cmd: "openstack port set --tag {{ cluster_id_tag }} {{ os_port_bootstrap }}"
+- name: slurp bootstrap ignition
+  slurp:
+    src: "{{ ocp_install_dir }}/{{ os_bootstrap_ignition }}"
+  register: bootstrap_ignition_slurp
 
-  - name: 'Create the bootstrap server'
-    os_server:
-      name: "{{ os_bootstrap_server_name }}"
-      image: "{{ os_image_rhcos }}"
-      flavor: "{{ os_flavor_master }}"
-      userdata: "{{ lookup('file', os_bootstrap_ignition) | string }}"
-      auto_ip: no
-      nics:
-      - port-name: "{{ os_port_bootstrap }}"
+- name: 'Create the bootstrap server'
+  os_server:
+    name: "{{ os_bootstrap_server_name }}"
+    image: "{{ os_image_rhcos }}"
+    boot_from_volume: "{{ os_cp_boot_from_volume | default(omit) }}"
+    terminate_volume: "{{ os_cp_terminate_volume | default(omit) }}"
+    volume_size: "{{ os_cp_volume_size | default(omit) }}"
+    flavor: "{{ os_flavor_master }}"
+    userdata: "{{ bootstrap_ignition_slurp['content'] | b64decode | string }}"
+    auto_ip: no
+    nics:
+    - port-name: "{{ os_port_bootstrap }}"
 
-  - name: 'Create the bootstrap floating IP'
-    os_floating_ip:
-      state: present
-      network: "{{ os_external_network }}"
-      server: "{{ os_bootstrap_server_name }}"
-    when: os_external_network is defined and os_external_network|length>0
+- name: 'Create the bootstrap floating IP'
+  os_floating_ip:
+    state: present
+    network: "{{ os_external_network }}"
+    server: "{{ os_bootstrap_server_name }}"
+  when: os_external_network is defined and os_external_network|length>0
